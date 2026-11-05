@@ -1,15 +1,62 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+
+const SETTINGS_STORAGE_KEY = "workbot-settings";
+
+type WorkspaceSettings = {
+  workspaceName: string;
+  emailDigest: boolean;
+};
+
+const DEFAULT_SETTINGS: WorkspaceSettings = {
+  workspaceName: "Acme Studio",
+  emailDigest: true,
+};
 
 export function SettingsForm() {
+  const [settings, setSettings] = useState<WorkspaceSettings>(DEFAULT_SETTINGS);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      try {
+        const storedSettings = window.localStorage.getItem(SETTINGS_STORAGE_KEY);
+        if (!storedSettings) return;
+
+        const parsed: unknown = JSON.parse(storedSettings);
+        if (
+          typeof parsed === "object" &&
+          parsed !== null &&
+          "workspaceName" in parsed &&
+          typeof parsed.workspaceName === "string" &&
+          "emailDigest" in parsed &&
+          typeof parsed.emailDigest === "boolean"
+        ) {
+          setSettings({ workspaceName: parsed.workspaceName, emailDigest: parsed.emailDigest });
+        }
+      } catch {
+        setError(true);
+      }
+    }, 0);
+
+    return () => window.clearTimeout(timeout);
+  }, []);
+
   return (
     <form
       className="mt-10 max-w-2xl divide-y divide-[#e8ede9] rounded-2xl border border-[#e8ede9] bg-white px-6"
       onSubmit={(event) => {
         event.preventDefault();
-        setSaved(true);
+        setSaved(false);
+        setError(false);
+        try {
+          window.localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+          setSaved(true);
+        } catch {
+          setError(true);
+        }
       }}
     >
       <section className="py-6">
@@ -21,7 +68,8 @@ export function SettingsForm() {
         <input
           id="workspace-name"
           name="workspaceName"
-          defaultValue="Acme Studio"
+          value={settings.workspaceName}
+          onChange={(event) => setSettings({ ...settings, workspaceName: event.target.value })}
           className="mt-2 w-full rounded-lg border border-[#dfe7e1] px-3.5 py-2.5 outline-none focus:border-[#478060] focus:ring-2 focus:ring-[#478060]/15"
         />
       </section>
@@ -36,7 +84,8 @@ export function SettingsForm() {
           <input
             aria-label="Weekly digest"
             type="checkbox"
-            defaultChecked
+            checked={settings.emailDigest}
+            onChange={(event) => setSettings({ ...settings, emailDigest: event.target.checked })}
             className="peer sr-only"
           />
           <span className="h-6 w-11 rounded-full bg-[#d6dfd8] after:absolute after:left-0.5 after:top-0.5 after:size-5 after:rounded-full after:bg-white after:shadow after:transition peer-checked:bg-[#478060] peer-checked:after:translate-x-5 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[#176b4a]" />
@@ -52,6 +101,11 @@ export function SettingsForm() {
         {saved && (
           <p role="status" className="text-sm text-[#347c59]">
             Your preferences have been saved.
+          </p>
+        )}
+        {error && (
+          <p role="alert" className="text-sm text-red-700">
+            Your preferences could not be saved or loaded. Please try again.
           </p>
         )}
       </div>
